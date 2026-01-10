@@ -44,20 +44,37 @@ Players can join rooms, take turns drawing words, guess in real time, chat with 
 ```
 
 doodle-duel/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── socket.js
-│   │   └── App.jsx
-│   └── public/
+├── skribble-clone/
 │
-├── backend/
-│   ├── rooms.js
-│   ├── socketHandlers.js
-│   └── index.js
+├── client/
+│ ├── dist/
+│ ├── public/
+│ ├── src/
+│ │ ├── assets/
+│ │ ├── components/
+│ │ ├── pages/
+│ │ │ ├── Game.jsx
+│ │ │ ├── Home.jsx
+│ │ │ └── Lobby.jsx
+│ │ ├── App.jsx
+│ │ ├── main.jsx
+│ │ ├── socket.js
+│ │ ├── PlaySound.js
+│ │ └── index.css
+│ ├── index.html
+│ ├── vite.config.js
+│ ├── package.json
+│ └── README.md
 │
-└── README.md
+├── server/
+│ ├── gameManager.js
+│ ├── socketHandlers.js
+│ ├── turnManager.js
+│ ├── utils.js
+│ ├── index.js
+│ └── package.json
+│
+└── .gitignore
 
 ````
 
@@ -120,7 +137,8 @@ export const socket = io("https://your-backend-url.onrender.com", {
 
 ## 📸 Screenshots
 
-*(Add screenshots of gameplay, lobby, leaderboard here)*
+<img width="1919" height="1038" alt="image" src="https://github.com/user-attachments/assets/12839586-3de3-4cc9-8429-411613ebeba9" />
+
 
 ---
 
@@ -146,24 +164,3 @@ export const socket = io("https://your-backend-url.onrender.com", {
 ## ⭐ Show Your Support
 
 If you like this project, please ⭐ the repository — it really helps!
-
-```
-
----
-
-### 🔥 Why this README is strong
-✅ Recruiter friendly  
-✅ Interview-ready explanation  
-✅ Shows **deployment + real-time systems**  
-✅ Looks like a **production project**, not college work  
-
----
-
-If you want, I can:
-- Customize it with **your GitHub username**
-- Add **badges** (Netlify, Render, React)
-- Write a **LinkedIn launch post**
-- Create **resume bullets** using this project
-
-Just say the word bhai 👑🔥
-```
