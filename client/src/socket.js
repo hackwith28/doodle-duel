@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-export const socket = io(" https://doodle-duel-1.onrender.com
+export const socket = io("https://doodle-duel-1.onrender.com
 ==> ", {
   transports: ["websocket"],
   reconnection: true,
