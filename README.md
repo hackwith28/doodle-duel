@@ -1,6 +1,3 @@
----
-
-```md
 # 🎨 Doodle Duel – Real-Time Multiplayer Drawing Game
 
 Doodle Duel is a real-time multiplayer drawing and guessing game inspired by Skribbl.io.  
