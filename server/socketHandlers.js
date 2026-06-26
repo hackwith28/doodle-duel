@@ -322,6 +322,65 @@ export function registerSocketHandlers(io) {
       io.to(roomId).emit("chat_message", { name, message });
     });
 
+    // EXPLICIT LEAVE ROOM (no grace period — player chose to leave)
+    // Uses an ack callback so the client knows the server processed it before disconnecting.
+    socket.on("leave_room", ({ roomId }, ack) => {
+      const room = rooms[roomId];
+      if (!room) { ack?.(); return; }
+
+      const idx = room.players.findIndex((p) => p.id === socket.id);
+      if (idx === -1) { ack?.(); return; }
+
+      const wasHost   = room.players[idx].isHost;
+      const wasDrawer = room.players[room.drawerIndex]?.id === socket.id;
+
+      room.players.splice(idx, 1);
+      socket.leave(roomId);
+
+      // KEY FIX: adjust drawerIndex after removal so it still points to the correct player.
+      // If the removed player's slot was BEFORE the current drawer, the array shifted left
+      // and drawerIndex now points one ahead — decrement it to compensate.
+      if (idx < room.drawerIndex) {
+        room.drawerIndex--;
+      }
+      if (room.drawerIndex < 0) room.drawerIndex = 0;
+      if (room.players.length > 0 && room.drawerIndex >= room.players.length) {
+        room.drawerIndex = 0;
+      }
+
+      // Acknowledge immediately so client can safely disconnect/navigate
+      ack?.();
+
+      if (wasHost && room.players.length > 0) {
+        room.players.forEach((p) => (p.isHost = false));
+        room.players[0].isHost = true;
+        io.to(roomId).emit("host_changed", {
+          newHost:   room.players[0].name,
+          newHostId: room.players[0].id,
+        });
+      }
+
+      if (room.players.length === 0) {
+        if (room._turnTimer)     { clearInterval(room._turnTimer);    room._turnTimer     = null; }
+        if (room._revealTimeout) { clearTimeout(room._revealTimeout); room._revealTimeout = null; }
+        delete rooms[roomId];
+      } else {
+        io.to(roomId).emit("players_update", getPlayersWithScores(room));
+
+        if (wasDrawer && room.gameStarted && room.turnActive) {
+          if (room._turnTimer)     { clearInterval(room._turnTimer);    room._turnTimer     = null; }
+          if (room._revealTimeout) { clearTimeout(room._revealTimeout); room._revealTimeout = null; }
+          room.turnActive = false;
+          room.roundOver  = false;
+          if (room.guessedCorrectly) room.guessedCorrectly.clear();
+          io.to(roomId).emit("round_end");
+          setTimeout(() => startNextTurn(roomId), 1500);
+        }
+      }
+
+      console.log(`[server] leave_room: ${socket.id} left ${roomId}`);
+    });
+
     // DISCONNECT
     socket.on("disconnect", () => {
       console.log("🔴 Client disconnected:", socket.id);
@@ -332,26 +391,35 @@ export function registerSocketHandlers(io) {
         if (!disconnecting) continue;
 
         const removePlayer = () => {
-          // If socket.id changed, this player reconnected — skip removal
-          const stillDisconnected = room.players.find((p) => p.id === socket.id);
-          if (!stillDisconnected) return;
+          // Player may have already been removed by leave_room — skip if so
+          const idx = room.players.findIndex((p) => p.id === socket.id);
+          if (idx === -1) return;
 
-          const wasHost = stillDisconnected.isHost;
+          const wasHost   = room.players[idx].isHost;
           const wasDrawer = room.players[room.drawerIndex]?.id === socket.id;
 
-          room.players = room.players.filter((p) => p.id !== socket.id);
+          room.players.splice(idx, 1);
+
+          // KEY FIX: keep drawerIndex pointing at the correct player after removal.
+          if (idx < room.drawerIndex) {
+            room.drawerIndex--;
+          }
+          if (room.drawerIndex < 0) room.drawerIndex = 0;
+          if (room.players.length > 0 && room.drawerIndex >= room.players.length) {
+            room.drawerIndex = 0;
+          }
 
           if (wasHost && room.players.length > 0) {
             room.players.forEach((p) => (p.isHost = false));
             room.players[0].isHost = true;
             io.to(roomId).emit("host_changed", {
-              newHost: room.players[0].name,
+              newHost:   room.players[0].name,
               newHostId: room.players[0].id,
             });
           }
 
           if (room.players.length === 0) {
-            if (room._turnTimer) { clearInterval(room._turnTimer); room._turnTimer = null; }
+            if (room._turnTimer)     { clearInterval(room._turnTimer);    room._turnTimer     = null; }
             if (room._revealTimeout) { clearTimeout(room._revealTimeout); room._revealTimeout = null; }
             delete rooms[roomId];
           } else {
@@ -361,14 +429,12 @@ export function registerSocketHandlers(io) {
               customWords: room.customWords,
             });
 
-            // Drawer left mid-game — stop the timer and advance to next turn
             if (wasDrawer && room.gameStarted && room.turnActive) {
-              if (room._turnTimer) { clearInterval(room._turnTimer); room._turnTimer = null; }
+              if (room._turnTimer)     { clearInterval(room._turnTimer);    room._turnTimer     = null; }
               if (room._revealTimeout) { clearTimeout(room._revealTimeout); room._revealTimeout = null; }
               room.turnActive = false;
-              room.roundOver = false;
+              room.roundOver  = false;
               room.guessedCorrectly = new Set();
-              if (room.drawerIndex >= room.players.length) room.drawerIndex = 0;
               io.to(roomId).emit("round_end");
               setTimeout(() => startNextTurn(roomId), 1500);
             }

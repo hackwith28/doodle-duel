@@ -3,7 +3,7 @@ import Home from "./pages/Home";
 import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
 import Login from "./pages/Login";
-import { connectSocket, disconnectSocket } from "./socket";
+import { connectSocket, disconnectSocket, socket } from "./socket";
 import { playOne, unlock as unlockAudio } from "./PlaySound";
 
 export default function App() {
@@ -56,13 +56,47 @@ export default function App() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("username");
-    localStorage.removeItem("player");
-    disconnectSocket();
-    setAuth(null);
-    setPlayer(null);
-    setStage("home");
+    const cleanup = () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("username");
+      localStorage.removeItem("player");
+      localStorage.removeItem("playerTimestamp");
+      disconnectSocket();
+      setAuth(null);
+      setPlayer(null);
+      setStage("home");
+    };
+
+    if (player?.roomId) {
+      // Wait for server ack before disconnecting so the event isn't dropped
+      const timeout = setTimeout(cleanup, 1500); // fallback if server is slow
+      socket.emit("leave_room", { roomId: player.roomId }, () => {
+        clearTimeout(timeout);
+        cleanup();
+      });
+    } else {
+      cleanup();
+    }
+  }
+
+  function handleLeaveRoom() {
+    // Socket stays connected (user stays logged in) — ack is instant
+    const finish = () => {
+      localStorage.removeItem("player");
+      localStorage.removeItem("playerTimestamp");
+      setPlayer(null);
+      setStage("home");
+    };
+
+    if (player?.roomId) {
+      const timeout = setTimeout(finish, 1500);
+      socket.emit("leave_room", { roomId: player.roomId }, () => {
+        clearTimeout(timeout);
+        finish();
+      });
+    } else {
+      finish();
+    }
   }
 
   function handleJoin(p) {
@@ -81,11 +115,11 @@ export default function App() {
   }
 
   if (stage === "lobby") {
-    return <Lobby player={player} setStage={setStage} />;
+    return <Lobby player={player} setStage={setStage} onLeaveRoom={handleLeaveRoom} />;
   }
 
   if (stage === "game") {
-    return <Game player={player} />;
+    return <Game player={player} onLeaveRoom={handleLeaveRoom} />;
   }
 
   return null;
