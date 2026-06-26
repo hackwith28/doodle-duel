@@ -102,6 +102,33 @@ export default function Game({ player: propPlayer }) {
       </div>
     );
   }
+  // On mount, immediately request current room state (handles reconnection after refresh)
+  useEffect(() => {
+    const restore = () => {
+      socket.emit("request_room_state", { roomId: player.roomId }, (payload) => {
+        if (!payload) return;
+        setPlayers(payload.players || []);
+        setRoundReadyCount(payload.readyCount || 0);
+        setReadyIds(payload.readyIds || []);
+        setMarkedRoundReady(!!(payload.readyIds && payload.readyIds.includes(socket.id)));
+        setIsRoundReady(!!payload.turnActive);
+        setCurrentDrawerId(payload.drawer ?? null);
+        if (payload.hint?.text) setDrawerWord(formatHint(payload.hint.text));
+        setTimeLeft(payload.timeLeft ?? payload.roundTime ?? 60);
+        setLeaderboard(payload.scores || {});
+        if (payload.word && payload.drawer === socket.id) setFullWord(payload.word);
+      });
+    };
+
+    if (socket.connected) {
+      restore();
+    } else {
+      socket.once("connect", restore);
+    }
+
+    return () => socket.off("connect", restore);
+  }, [player.roomId]);
+
   // Socket event handlers with proper dependency
   useEffect(() => {
     if (!socket) return;
@@ -226,15 +253,20 @@ export default function Game({ player: propPlayer }) {
           markRoundReady={markRoundReady}
         />
       ) : (
-        <div className="flex px-6 gap-6 pt-4">
-          {/* LEFT PANEL */}
-          <div className="w-[260px] flex-shrink-0 space-y-6">
-            <PlayerList players={players} currentDrawerId={currentDrawerId} />
-            <Leaderboard players={players} />
+        <div className="flex flex-col lg:flex-row px-2 sm:px-4 lg:px-6 gap-3 lg:gap-6 pt-3 pb-4">
+
+          {/* LEFT PANEL — stacks below canvas on mobile, left column on desktop */}
+          <div className="order-last lg:order-first lg:w-56 lg:flex-shrink-0 flex flex-row lg:flex-col gap-3">
+            <div className="flex-1 lg:flex-none">
+              <PlayerList players={players} currentDrawerId={currentDrawerId} />
+            </div>
+            <div className="flex-1 lg:flex-none">
+              <Leaderboard players={players} />
+            </div>
           </div>
 
           {/* CENTER CANVAS */}
-          <div className="flex-1 flex justify-center">
+          <div className="flex-1 min-w-0 order-first lg:order-none">
             <CanvasBoard
               player={player}
               isDrawer={isDrawer}
@@ -242,8 +274,8 @@ export default function Game({ player: propPlayer }) {
             />
           </div>
 
-          {/* RIGHT CHAT */}
-          <div className="w-[320px] flex-shrink-0">
+          {/* RIGHT CHAT — fixed height on mobile, full height on desktop */}
+          <div className="lg:w-72 lg:flex-shrink-0 h-56 sm:h-64 lg:h-auto order-2 lg:order-last">
             <ChatBox
               chatMessages={chatMessages}
               message={message}
@@ -252,6 +284,7 @@ export default function Game({ player: propPlayer }) {
               isDrawer={isDrawer}
             />
           </div>
+
         </div>
       )}
     </div>

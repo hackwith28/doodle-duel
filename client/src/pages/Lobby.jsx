@@ -28,7 +28,6 @@ export default function Lobby({ player, setStage }) {
       // Join the room
       socket.emit("join_room", {
         roomId: player.roomId,
-        name: player.name,
         isHost: player.isHost,
       });
     };
@@ -362,31 +361,47 @@ export default function Lobby({ player, setStage }) {
             </div>
 
             {/* Start Game Button */}
-            <div className="text-center">
-              <button
-                onClick={startGame}
-                className="bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 hover:from-pink-300 hover:via-purple-300 hover:to-indigo-300 disabled:from-gray-600 disabled:to-gray-700 text-black font-black py-5 px-12 rounded-2xl text-xl shadow-lg hover:shadow-2xl disabled:shadow-none transform hover:scale-110 active:scale-95 disabled:scale-100 transition-all duration-200 border-3 border-white/30 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
-              >
-                <span className="flex items-center justify-center gap-3">
-                  <span className="text-2xl">🚀</span>
-                  START GAME!
-                </span>
-              </button>
+            {(() => {
+              const nonHostPlayers = players.filter((p) => !p.isHost);
+              const allReady =
+                nonHostPlayers.length > 0 &&
+                nonHostPlayers.every((p) => p.ready);
+              const notEnoughPlayers = players.length < 2;
 
-              <p className="text-white/80 font-bold text-base">
-                {!infoMessage ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="text-xl">⏳</span>
-                    Waiting for all players to be ready!
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-2 text-green-300 animate-pulse">
-                    <span className="text-xl">✓</span>
-                    Everyone is ready! Let's go!
-                  </span>
-                )}
-              </p>
-            </div>
+              return (
+                <div className="text-center">
+                  <button
+                    onClick={startGame}
+                    disabled={!allReady || notEnoughPlayers}
+                    className="bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 hover:from-pink-300 hover:via-purple-300 hover:to-indigo-300 disabled:from-gray-600 disabled:to-gray-700 text-black font-black py-5 px-12 rounded-2xl text-xl shadow-lg hover:shadow-2xl disabled:shadow-none transform hover:scale-110 active:scale-95 disabled:scale-100 transition-all duration-200 border-3 border-white/30 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+                  >
+                    <span className="flex items-center justify-center gap-3">
+                      <span className="text-2xl">🚀</span>
+                      START GAME!
+                    </span>
+                  </button>
+
+                  <p className="text-white/80 font-bold text-base">
+                    {notEnoughPlayers ? (
+                      <span className="flex items-center justify-center gap-2 text-yellow-300">
+                        <span className="text-xl">👥</span>
+                        Need at least 2 players to start!
+                      </span>
+                    ) : allReady ? (
+                      <span className="flex items-center justify-center gap-2 text-green-300 animate-pulse">
+                        <span className="text-xl">✓</span>
+                        Everyone is ready! Let's go!
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="text-xl">⏳</span>
+                        Waiting for all players to click I'M READY...
+                      </span>
+                    )}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         )}
 

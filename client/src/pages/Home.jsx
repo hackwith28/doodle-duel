@@ -1,56 +1,35 @@
-﻿import { useState, useEffect, useRef } from "react";
+﻿import { useState } from "react";
 import { socket } from "../socket";
 
-export default function Home({ setPlayer }) {
-  const [name, setName] = useState("");
+export default function Home({ setPlayer, username, onLogout }) {
   const [roomId, setRoomId] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
   const [showRoomCreated, setShowRoomCreated] = useState(false);
 
   // Create a new room
   const createRoom = () => {
-    if (!name.trim()) {
-      alert("✏️ Please enter your name first!");
-      return;
-    }
-
     const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     setRoomId(newRoomId);
-    setIsCreating(true);
     setShowRoomCreated(true);
-
     setTimeout(() => setShowRoomCreated(false), 3000);
 
-    const playerData = {
-      name: name.trim(),
-      roomId: newRoomId,
-      isHost: true,
-    };
-
-    // Emit socket event to create room on server
+    const playerData = { name: username, roomId: newRoomId, isHost: true };
     socket.emit("create_room", { roomId: newRoomId });
-
-    // Navigate to lobby
     setPlayer(playerData);
     localStorage.setItem("player", JSON.stringify(playerData));
+    localStorage.setItem("playerTimestamp", Date.now().toString());
   };
 
   // Join an existing room
   const joinRoom = () => {
-    if (!name.trim() || !roomId.trim()) {
-      alert("✏️ Please enter both name and room ID!");
+    if (!roomId.trim()) {
+      alert("✏️ Please enter a room code!");
       return;
     }
 
-    const playerData = {
-      name: name.trim(),
-      roomId: roomId.trim(),
-      isHost: false,
-    };
-
-    // Navigate to lobby (will emit join_room from Lobby component)
+    const playerData = { name: username, roomId: roomId.trim(), isHost: false };
     setPlayer(playerData);
     localStorage.setItem("player", JSON.stringify(playerData));
+    localStorage.setItem("playerTimestamp", Date.now().toString());
   };
 
   return (
@@ -170,44 +149,40 @@ export default function Home({ setPlayer }) {
             </div>
           )}
 
-          {/* Input fields */}
-          <div className="space-y-5 mb-6">
-            <div>
-              <label className="flex items-center gap-2 text-white font-bold mb-2 text-sm tracking-wide">
-                <span className="text-xl">👤</span>
-                <span className="text-yellow-300">YOUR NAME</span>
-              </label>
-              <input
-                type="text"
-                className="w-full py-4 px-5 bg-white/15 border-3 border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-yellow-400 focus:bg-white/20 focus:ring-4 focus:ring-yellow-400/20 transition-all duration-200 text-lg font-bold"
-                placeholder="Enter your awesome name..."
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+          {/* Logged-in user banner */}
+          <div className="flex items-center justify-between bg-white/10 border-2 border-white/20 rounded-2xl px-4 py-3 mb-6">
+            <span className="text-white font-bold text-sm">
+              👤 <span className="text-yellow-300">{username}</span>
+            </span>
+            <button
+              onClick={onLogout}
+              className="text-white/50 hover:text-red-400 text-xs font-black uppercase tracking-wider transition-colors duration-200"
+            >
+              Logout
+            </button>
+          </div>
 
-            <div>
-              <label className="flex items-center gap-2 text-white font-bold mb-2 text-sm tracking-wide">
-                <span className="text-xl">🚪</span>
-                <span className="text-pink-300">ROOM CODE</span>
-              </label>
-              <input
-                type="text"
-                className="w-full py-4 px-5 bg-white/15 border-3 border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:bg-white/20 focus:ring-4 focus:ring-pink-400/20 transition-all duration-200 text-lg font-bold uppercase tracking-widest"
-                placeholder="Enter or create room..."
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                maxLength={6}
-              />
-            </div>
+          {/* Room code input */}
+          <div className="mb-6">
+            <label className="flex items-center gap-2 text-white font-bold mb-2 text-sm tracking-wide">
+              <span className="text-xl">🚪</span>
+              <span className="text-pink-300">ROOM CODE</span>
+            </label>
+            <input
+              type="text"
+              className="w-full py-4 px-5 bg-white/15 border-3 border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:bg-white/20 focus:ring-4 focus:ring-pink-400/20 transition-all duration-200 text-lg font-bold uppercase tracking-widest"
+              placeholder="Enter room code to join..."
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+              maxLength={6}
+            />
           </div>
 
           {/* Action buttons */}
           <div className="flex gap-4 mb-6">
             <button
               onClick={createRoom}
-              disabled={!name.trim()}
-              className="flex-1 bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-400 hover:from-yellow-300 hover:via-orange-300 hover:to-pink-300 disabled:from-gray-600 disabled:to-gray-700 text-black font-black text-lg py-4 px-6 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-2 border-white/30"
+              className="flex-1 bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-400 hover:from-yellow-300 hover:via-orange-300 hover:to-pink-300 text-black font-black text-lg py-4 px-6 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-white/30"
             >
               <span className="flex items-center justify-center gap-2">
                 <span className="text-xl">✨</span>
@@ -217,7 +192,7 @@ export default function Home({ setPlayer }) {
 
             <button
               onClick={joinRoom}
-              disabled={!name.trim() || !roomId.trim()}
+              disabled={!roomId.trim()}
               className="flex-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 hover:from-cyan-300 hover:via-blue-300 hover:to-purple-300 disabled:from-gray-600 disabled:to-gray-700 text-black font-black text-lg py-4 px-6 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-2 border-white/30"
             >
               <span className="flex items-center justify-center gap-2">

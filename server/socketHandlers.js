@@ -20,16 +20,33 @@ export function registerSocketHandlers(io) {
     });
 
     // JOIN ROOM
-    socket.on("join_room", ({ roomId, name, isHost }) => {
+    socket.on("join_room", ({ roomId, isHost }) => {
       if (!rooms[roomId]) createRoom(roomId);
 
       const room = rooms[roomId];
+      const name = socket.data.user.username;
+      const userId = socket.data.user.id;
 
-      const existingPlayer = room.players.find((p) => p.id === socket.id);
-      if (existingPlayer) {
-        console.log(
-          `[server] player ${socket.id} already in room ${roomId}, skipping duplicate join`
-        );
+      // Reconnection: same user, new socket (e.g. page refresh)
+      const reconnecting = room.players.find((p) => p.userId === userId);
+      if (reconnecting) {
+        console.log(`[server] reconnection: ${name} rejoined ${roomId}`);
+        reconnecting.id = socket.id;
+        socket.join(roomId);
+        io.to(roomId).emit("players_update", getPlayersWithScores(room));
+        if (room.gameStarted) {
+          socket.emit("game_started");
+        } else {
+          io.to(roomId).emit("room_settings", {
+            roundTime: room.roundTime,
+            customWords: room.customWords,
+          });
+        }
+        return;
+      }
+
+      // Duplicate same socket
+      if (room.players.find((p) => p.id === socket.id)) {
         socket.join(roomId);
         io.to(roomId).emit("players_update", getPlayersWithScores(room));
         return;
@@ -37,6 +54,7 @@ export function registerSocketHandlers(io) {
 
       const player = {
         id: socket.id,
+        userId,
         name,
         isHost: isHost !== undefined ? isHost : room.players.length === 0,
         ready: false,
@@ -46,10 +64,16 @@ export function registerSocketHandlers(io) {
 
       socket.join(roomId);
       io.to(roomId).emit("players_update", getPlayersWithScores(room));
-      io.to(roomId).emit("room_settings", {
-        roundTime: room.roundTime,
-        customWords: room.customWords,
-      });
+
+      if (room.gameStarted) {
+        // Late joiner — send them straight into the game
+        socket.emit("game_started");
+      } else {
+        io.to(roomId).emit("room_settings", {
+          roundTime: room.roundTime,
+          customWords: room.customWords,
+        });
+      }
     });
 
     // PLAYER READY
@@ -75,9 +99,8 @@ export function registerSocketHandlers(io) {
     socket.on("send_message", ({ roomId, message }) => {
       const room = rooms[roomId];
       if (!room) return;
-      const player = room.players.find((p) => p.id === socket.id);
-      if (!player) return;
-      io.to(roomId).emit("new_message", { senderName: player.name, message });
+      const senderName = socket.data.user.username;
+      io.to(roomId).emit("new_message", { senderName, message });
     });
 
     // HOST STARTS GAME
@@ -233,10 +256,11 @@ export function registerSocketHandlers(io) {
     });
 
     // CHAT + GUESS + SCORE
-    socket.on("chat_message", ({ roomId, name, message }) => {
+    socket.on("chat_message", ({ roomId, message }) => {
       const room = rooms[roomId];
 
       if (!room) return;
+      const name = socket.data.user.username;
       const drawer = room.players[room.drawerIndex];
 
       if (drawer && socket.id === drawer.id) {
@@ -300,36 +324,64 @@ export function registerSocketHandlers(io) {
 
     // DISCONNECT
     socket.on("disconnect", () => {
+      console.log("🔴 Client disconnected:", socket.id);
+
       for (const roomId in rooms) {
         const room = rooms[roomId];
-
         const disconnecting = room.players.find((p) => p.id === socket.id);
-        const wasHost = !!disconnecting?.isHost;
+        if (!disconnecting) continue;
 
-        room.players = room.players.filter((p) => p.id !== socket.id);
+        const removePlayer = () => {
+          // If socket.id changed, this player reconnected — skip removal
+          const stillDisconnected = room.players.find((p) => p.id === socket.id);
+          if (!stillDisconnected) return;
 
-        if (wasHost && room.players.length > 0) {
-          room.players.forEach((p) => (p.isHost = false));
-          room.players[0].isHost = true;
+          const wasHost = stillDisconnected.isHost;
+          const wasDrawer = room.players[room.drawerIndex]?.id === socket.id;
 
-          io.to(roomId).emit("host_changed", {
-            newHost: room.players[0].name,
-            newHostId: room.players[0].id,
-          });
-        }
+          room.players = room.players.filter((p) => p.id !== socket.id);
 
-        if (room.players.length === 0) {
-          delete rooms[roomId];
+          if (wasHost && room.players.length > 0) {
+            room.players.forEach((p) => (p.isHost = false));
+            room.players[0].isHost = true;
+            io.to(roomId).emit("host_changed", {
+              newHost: room.players[0].name,
+              newHostId: room.players[0].id,
+            });
+          }
+
+          if (room.players.length === 0) {
+            if (room._turnTimer) { clearInterval(room._turnTimer); room._turnTimer = null; }
+            if (room._revealTimeout) { clearTimeout(room._revealTimeout); room._revealTimeout = null; }
+            delete rooms[roomId];
+          } else {
+            io.to(roomId).emit("players_update", getPlayersWithScores(room));
+            io.to(roomId).emit("room_settings", {
+              roundTime: room.roundTime,
+              customWords: room.customWords,
+            });
+
+            // Drawer left mid-game — stop the timer and advance to next turn
+            if (wasDrawer && room.gameStarted && room.turnActive) {
+              if (room._turnTimer) { clearInterval(room._turnTimer); room._turnTimer = null; }
+              if (room._revealTimeout) { clearTimeout(room._revealTimeout); room._revealTimeout = null; }
+              room.turnActive = false;
+              room.roundOver = false;
+              room.guessedCorrectly = new Set();
+              if (room.drawerIndex >= room.players.length) room.drawerIndex = 0;
+              io.to(roomId).emit("round_end");
+              setTimeout(() => startNextTurn(roomId), 1500);
+            }
+          }
+        };
+
+        // Give 5s grace period during active game to allow page-refresh reconnection
+        if (room.gameStarted) {
+          setTimeout(removePlayer, 5000);
         } else {
-          io.to(roomId).emit("players_update", getPlayersWithScores(room));
-          io.to(roomId).emit("room_settings", {
-            roundTime: room.roundTime,
-            customWords: room.customWords,
-          });
+          removePlayer();
         }
       }
-
-      console.log("🔴 Client disconnected:", socket.id);
     });
   });
 }

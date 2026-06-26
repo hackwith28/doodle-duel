@@ -394,100 +394,81 @@ export default function CanvasBoard({ player, isDrawer, clearKey }) {
     <div className="flex flex-col gap-4 p-4 bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl border-4 border-purple-600 shadow-2xl">
       {/* Toolbar */}
 
-      <div className="bg-gradient-to-r from-purple-700 to-indigo-800 border-3 border-purple-500 rounded-2xl p-4 shadow-lg">
-        {isDrawer && (
-          <div className="flex flex-wrap gap-2 mb-4 justify-center">
-            <button
-              className={`px-4 py-2 rounded-xl font-bold border-3 transition-all duration-200 transform hover:scale-105 ${
-                tool === "pencil"
-                  ? "bg-yellow-400 border-yellow-500 text-purple-900 shadow-lg"
-                  : "bg-slate-600 border-slate-500 text-white hover:bg-slate-500"
-              }`}
-              onClick={() => setTool("pencil")}
-            >
-              ✏️ Pencil
-            </button>
-            <button
-              className={`px-4 py-2 rounded-xl font-bold border-3 transition-all duration-200 transform hover:scale-105 ${
-                tool === "pen"
-                  ? "bg-yellow-400 border-yellow-500 text-purple-900 shadow-lg"
-                  : "bg-slate-600 border-slate-500 text-white hover:bg-slate-500"
-              }`}
-              onClick={() => setTool("pen")}
-            >
-              🖊️ Pen
-            </button>
-            <button
-              className={`px-4 py-2 rounded-xl font-bold border-3 transition-all duration-200 transform hover:scale-105 ${
-                tool === "eraser"
-                  ? "bg-yellow-400 border-yellow-500 text-purple-900 shadow-lg"
-                  : "bg-slate-600 border-slate-500 text-white hover:bg-slate-500"
-              }`}
-              onClick={() => setTool("eraser")}
-            >
-              🗑️ Eraser
-            </button>
-            <button
-              className={`px-4 py-2 rounded-xl font-bold border-3 transition-all duration-200 transform hover:scale-105 ${
-                tool === "fill"
-                  ? "bg-yellow-400 border-yellow-500 text-purple-900 shadow-lg"
-                  : "bg-slate-600 border-slate-500 text-white hover:bg-slate-500"
-              }`}
-              onClick={() => setTool("fill")}
-            >
-              🪣 Fill
-            </button>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-4 justify-center items-center">
-          <div className="flex items-center gap-2">
-            <label className="text-white font-bold text-sm">🎨 Color:</label>
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-12 h-12 rounded-xl border-3 border-yellow-400 cursor-pointer shadow-lg"
-            />
+      {isDrawer && (
+        <div className="bg-gradient-to-r from-purple-700 to-indigo-800 border-3 border-purple-500 rounded-2xl p-2 sm:p-4 shadow-lg">
+          {/* Tool buttons */}
+          <div className="flex flex-wrap gap-1 sm:gap-2 mb-2 sm:mb-4 justify-center">
+            {[
+              { id: "pencil", label: "✏️ Pencil" },
+              { id: "pen",    label: "🖊️ Pen" },
+              { id: "eraser", label: "🗑️ Eraser" },
+              { id: "fill",   label: "🪣 Fill" },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                className={`px-2 sm:px-4 py-1 sm:py-2 rounded-xl font-bold border-2 text-xs sm:text-sm transition-all duration-200 transform hover:scale-105 ${
+                  tool === id
+                    ? "bg-yellow-400 border-yellow-500 text-purple-900 shadow-lg"
+                    : "bg-slate-600 border-slate-500 text-white hover:bg-slate-500"
+                }`}
+                onClick={() => setTool(id)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
-          <div className="flex items-center gap-3 bg-slate-700 px-4 py-2 rounded-xl border-2 border-slate-600">
-            <label className="text-white font-bold text-sm">📋 Size:</label>
-            <input
-              type="range"
-              min="1"
-              max="30"
-              value={brushSize}
-              onChange={(e) => setBrushSize(Number(e.target.value))}
-              className="w-24 h-3 bg-slate-600 rounded-full appearance-none cursor-pointer accent-yellow-400"
-            />
-            <span className="text-white font-bold text-sm bg-yellow-400 text-purple-900 px-2 py-1 rounded-lg">
-              {brushSize}
-            </span>
+          {/* Color + Size */}
+          <div className="flex flex-wrap gap-2 sm:gap-4 justify-center items-center">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <label className="text-white font-bold text-xs sm:text-sm">🎨 Color:</label>
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl border-2 border-yellow-400 cursor-pointer shadow-lg"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 sm:gap-3 bg-slate-700 px-2 sm:px-4 py-1 sm:py-2 rounded-xl border-2 border-slate-600">
+              <label className="text-white font-bold text-xs sm:text-sm">📋 Size:</label>
+              <input
+                type="range"
+                min="1"
+                max="30"
+                value={brushSize}
+                onChange={(e) => setBrushSize(Number(e.target.value))}
+                className="w-16 sm:w-24 h-2 sm:h-3 bg-slate-600 rounded-full appearance-none cursor-pointer accent-yellow-400"
+              />
+              <span className="text-white font-bold text-xs sm:text-sm bg-yellow-400 text-purple-900 px-1 sm:px-2 py-0.5 sm:py-1 rounded-lg">
+                {brushSize}
+              </span>
+            </div>
+          </div>
+
+          {/* Undo / Redo / Clear */}
+          <div className="flex gap-1 sm:gap-2 justify-center mt-2 sm:mt-4 flex-wrap">
+            <button
+              onClick={undo}
+              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-1 sm:py-2 px-2 sm:px-4 rounded-xl font-bold border-2 border-blue-400 text-xs sm:text-sm transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              ↶ Undo
+            </button>
+            <button
+              onClick={redo}
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-1 sm:py-2 px-2 sm:px-4 rounded-xl font-bold border-2 border-green-400 text-xs sm:text-sm transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              ↷ Redo
+            </button>
+            <button
+              onClick={clearBoard}
+              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-1 sm:py-2 px-2 sm:px-4 rounded-xl font-bold border-2 border-red-400 text-xs sm:text-sm transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              🗑️ Clear
+            </button>
           </div>
         </div>
-
-        <div className="flex gap-2 justify-center mt-4 flex-wrap">
-          <button
-            onClick={undo}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2 px-4 rounded-xl font-bold border-3 border-blue-400 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            ↶ Undo
-          </button>
-          <button
-            onClick={redo}
-            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-2 px-4 rounded-xl font-bold border-3 border-green-400 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            ↷ Redo
-          </button>
-          <button
-            onClick={clearBoard}
-            className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-2 px-4 rounded-xl font-bold border-3 border-red-400 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            🗑️ Clear
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Canvas */}
       <canvas
